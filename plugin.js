@@ -1,4 +1,4 @@
-plugin = {
+const plugin = {
   appOption: {
     "Single tag": async function(app) {
       try {
@@ -56,7 +56,39 @@ plugin = {
       } catch (err) {
         await app.alert(err);
       }
-    }
+    },
+
+    "Everything to CSV": async function(app) {
+      try {
+        // This works fine with ~5000 notes on a modern laptop
+        // Hard to say what happens on slower machines, or bigger accounts
+        const notes = await app.filterNotes();
+        let csvContent = "";
+        csvContent += "UUID,Title,Tags,Content\n";
+
+        let index = 1;
+
+        for (const note of notes) {
+          const content = await app.getNoteContent(note);
+          // We escape all double quotes by adding anothe double quote before it
+          // CSV standards dictate that we can wrap something between double quotes and
+          // it will be considered as a single entry in a column (even with line breaks)
+          let row = `"${note.uuid}","${note.name}","${note.tags.join(",")}","${content.replace(/"/g, '""')}"\n`;
+          csvContent += row;
+
+          if (csvContent.length > 1e5) {
+            // Generate and download CSV when exceeding certain file size
+            const finalBlob = new Blob([csvContent], {type: "text/csv"});
+            await app.saveFile(finalBlob, `export-${ index }.csv`);
+            csvContent = "";
+            index += 1;
+          }
+        }
+        return;
+      } catch (err) {
+        await app.alert(err); 
+      }
+    },
   },
 
   async _createZipBlob(notes) {
@@ -83,3 +115,4 @@ plugin = {
     });
   },
 }; 
+export default plugin;
